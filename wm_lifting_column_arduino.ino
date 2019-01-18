@@ -1,3 +1,7 @@
+#include <ros.h>
+#include <std_msgs/UInt32.h>
+#include <std_msgs/Int32.h>
+
 const int pin_hallSensorA = 2;
 const int pin_hallSensorB = 3;
 const int pin_m1 = 5;
@@ -11,8 +15,36 @@ unsigned long lastMicros_int   = 0;
 const int pulseTime_minReal    = 12400;
 const int pulseTime_minTolered =  9500;
 
+std_msgs::Int32 actuator_state; // -1 down, 0 stop, 1 up
+
+
+ros::NodeHandle nh;
+std_msgs::UInt32 position_value;
+
+ros::Publisher state_pub("column/state", &actuator_state);
+ros::Publisher position_pub("column/position", &position_value); // debugging purpose
+
+void set_state(const std_msgs::Int32& value)
+{
+  if(value.data == -1)
+    actuator_state.data = -1;
+  else if(value.data == 0)
+    actuator_state.data = 0;
+  else if(value.data == 1)
+    actuator_state.data = 1;
+  state_pub.publish( &actuator_state );
+}
+
+ros::Subscriber<std_msgs::Int32> sub_cmd("/column/cmd", set_state );
+
+
 void setup() 
 {
+  nh.initNode();
+  nh.advertise(position_pub);
+  nh.advertise(state_pub);
+  nh.subscribe(sub_cmd);
+
   pinMode(pin_m1, OUTPUT);
   pinMode(pin_m2, OUTPUT);
   digitalWrite(pin_m1, LOW);
@@ -23,6 +55,7 @@ void setup()
   pinMode(pin_Btn_DN, INPUT_PULLUP);
   Serial.begin(115200);
   attachInterrupt(digitalPinToInterrupt(pin_hallSensorA), callback_pin2, FALLING);
+  
 }
 
 int accu = 0;
@@ -49,7 +82,8 @@ void loop()
     digitalWrite(pin_m1, LOW);
     digitalWrite(pin_m2, LOW);
   }
-  
+  nh.spinOnce();
+  position_pub.publish( &position_value );
 }
 
 void callback_pin2()
@@ -66,6 +100,8 @@ void callback_pin2()
     {
       position_count --;
     }
-  }
+    position_value.data = position_count;
+    //position_pub.publish( &position_value );
+  }  
   lastMicros_int = micros();
 }
