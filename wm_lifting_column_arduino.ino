@@ -9,7 +9,7 @@ volatile long position_count = 0;
 
 unsigned long lastMicros_int   = 0;
 const int pulseTime_minReal    = 12400;
-const int pulseTime_minTolered =  9500;wm   
+const int pulseTime_minTolered =  9500;
 
 void setup() 
 {
