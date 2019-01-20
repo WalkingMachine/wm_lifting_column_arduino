@@ -7,7 +7,7 @@ from std_msgs.msg import Float64
 from sensor_msgs.msg import JointState
 
 jointstate_pub = rospy.Publisher('jointState', JointState, queue_size=10)
-stroke_length = 0,675
+stroke_length = 0.675
 max_pulse = 2387
 
 def callback_position(data):
@@ -16,7 +16,7 @@ def callback_position(data):
     js.name = ['column']
     js.velocity = []
     js.effort = []
-    js.position = data.data*stroke_length/max_pulse
+    js.position = [data.data*stroke_length/max_pulse]
     jointstate_pub.publish(js)
 
 def driver():
