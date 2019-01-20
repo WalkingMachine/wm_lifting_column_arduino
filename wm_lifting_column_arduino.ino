@@ -1,6 +1,11 @@
 #include <ros.h>
 #include <std_msgs/UInt32.h>
 #include <std_msgs/Int32.h>
+#include <std_msgs/Empty.h>
+
+#define UP 1
+#define DOWN -1
+#define STOP 0
 
 const int pin_hallSensorA = 2;
 const int pin_hallSensorB = 3;
@@ -19,7 +24,7 @@ std_msgs::Int32 actuator_state; // -1 down, 0 stop, 1 up
 
 
 ros::NodeHandle nh;
-std_msgs::UInt32 position_value;
+std_msgs::Int32 position_value;
 
 ros::Publisher state_pub("column/state", &actuator_state);
 ros::Publisher position_pub("column/position", &position_value); // debugging purpose
@@ -35,7 +40,13 @@ void set_state(const std_msgs::Int32& value)
   state_pub.publish( &actuator_state );
 }
 
+void set_zero(const std_msgs::Int32& value)
+{
+  position_count = 0;
+}
+
 ros::Subscriber<std_msgs::Int32> sub_cmd("/column/cmd", set_state );
+ros::Subscriber<std_msgs::Empty> sub_zero("/column/setZero", set_zero );
 
 
 void setup() 
@@ -44,6 +55,7 @@ void setup()
   nh.advertise(position_pub);
   nh.advertise(state_pub);
   nh.subscribe(sub_cmd);
+  nh.subscribe(sub_zero);
 
   pinMode(pin_m1, OUTPUT);
   pinMode(pin_m2, OUTPUT);
@@ -67,12 +79,12 @@ void loop()
   Serial.println(mm);
 
   accu = 0;
-  if(digitalRead(pin_Btn_UP) == LOW)
+  if(digitalRead(pin_Btn_UP) == LOW || actuator_state.data == UP)
   {
     digitalWrite(pin_m1, HIGH);
     digitalWrite(pin_m2, LOW);
   }
-  else if(digitalRead(pin_Btn_DN) == LOW)
+  else if(digitalRead(pin_Btn_DN) == LOW  || actuator_state.data == DOWN)
   {
     digitalWrite(pin_m1, LOW);
     digitalWrite(pin_m2, HIGH);

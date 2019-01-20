@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
-from std_msgs.msg import UInt32
+from std_msgs.msg import Int32
 from std_msgs.msg import Int8
 from std_msgs.msg import Float64
 from sensor_msgs.msg import JointState
@@ -20,7 +20,7 @@ def callback_position(data):
 
 def driver():
     rospy.init_node('column_state_publisher', anonymous=True)
-    rospy.Subscriber("column/position", UInt32, callback_position)
+    rospy.Subscriber("column/position", Int32, callback_position)
 
 
     rate = rospy.Rate(10) # 10hz
