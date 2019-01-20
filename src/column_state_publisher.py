@@ -16,7 +16,7 @@ def callback_position(data):
     js.name = ['column']
     js.velocity = []
     js.effort = []
-    js.position = data.data*stroke_length/max_pulse
+    js.position = [data.data*stroke_length/max_pulse]
     jointstate_pub.publish(js)
 
 def driver():
