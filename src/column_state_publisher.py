@@ -6,7 +6,7 @@ from std_msgs.msg import Int8
 from std_msgs.msg import Float64
 from sensor_msgs.msg import JointState
 
-jointstate_pub = rospy.Publisher('jointState', JointState, queue_size=10)
+jointstate_pub = rospy.Publisher('joint_states', JointState, queue_size=10)
 stroke_length = 0.675
 max_pulse = 2387
 
