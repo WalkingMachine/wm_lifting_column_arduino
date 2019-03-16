@@ -89,13 +89,10 @@ void setup()
   
 }
 
-int accu = 0;
-int polaru = 1;
 
 void loop() 
 {
   
-  accu = 0;
   if(digitalRead(pin_Btn_UP) == LOW)
   {
     actuator_state.data = topic_STOP; // override topic if btn is used
