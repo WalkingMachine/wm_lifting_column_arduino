@@ -136,7 +136,7 @@ void loop()
     digitalWrite(pin_PWM, STOP);
     
     if (flag_write_once){
-      EEPROM.write(1,position_count);
+      EEPROM.write(ROM_adr,position_count);
       flag_write_once = 0;
     }
     
