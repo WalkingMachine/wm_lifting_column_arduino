@@ -2,6 +2,7 @@
 #include <std_msgs/UInt32.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Empty.h>
+#include <EEPROM.h>
 
 #define UP 1
 #define DOWN 0
@@ -11,7 +12,7 @@
 #define START 1
 #define STOP 0
 
-
+const int ROM_adr = 0;
 const int pin_hallSensorA = 2;
 const int pin_hallSensorB = 3;
 const int pin_Btn_UP = 6;
@@ -20,11 +21,15 @@ const int pin_DIR = 4;
 const int pin_PWM = 5;
 const int max_value = 2387;
 
+
 volatile long position_count = 0;
 
 unsigned long lastMicros_int   = 0;
+int last_millis = millis();
 const int pulseTime_minReal    = 12400;
 const int pulseTime_minTolered =  9500;
+
+bool flag_write_once = 0;
 
 std_msgs::Int32 actuator_state; // -1 down, 0 stop, 1 up
 std_msgs::Int32 pwm_value; // 0 , 100 to 255 , -100 to -255
@@ -85,6 +90,9 @@ void setup()
   pinMode(pin_Btn_DN, INPUT_PULLUP);
   Serial.begin(57600);
   pwm_value.data = 0 ;
+  position_count = EEPROM.read(1);
+  position_value.data = position_count;
+  delay(10);
   attachInterrupt(digitalPinToInterrupt(pin_hallSensorA), callback_pin2, FALLING);
   
 }
@@ -92,44 +100,57 @@ void setup()
 
 void loop() 
 {
+  delay(10);
   
   if(digitalRead(pin_Btn_UP) == LOW)
   {
     actuator_state.data = topic_STOP; // override topic if btn is used
     digitalWrite(pin_DIR, UP);
     digitalWrite(pin_PWM, START);
+    flag_write_once = 1;
   }
   else if(digitalRead(pin_Btn_DN) == LOW)
   {
     actuator_state.data = topic_STOP; // override topic if btn is used
     digitalWrite(pin_DIR, DOWN);
     digitalWrite(pin_PWM, START);
+    flag_write_once = 1;
   }
   else if(actuator_state.data == topic_UP)
   {
     actuator_state.data = topic_UP; 
     digitalWrite(pin_DIR, UP);
     analogWrite(pin_PWM, pwm_value.data);
+    flag_write_once = 1;
   }
   else if(actuator_state.data == topic_DOWN)
   {
     actuator_state.data = topic_DOWN; 
     digitalWrite(pin_DIR, DOWN);
     analogWrite(pin_PWM, pwm_value.data);
+    flag_write_once = 1;
   }
   else
   {
     digitalWrite(pin_DIR, DOWN);
     digitalWrite(pin_PWM, STOP);
+    
+    if (flag_write_once){
+      EEPROM.write(1,position_count);
+      flag_write_once = 0;
+    }
+    
   }
-  nh.spinOnce();
-  position_pub.publish( &position_value );
+  if(millis() - last_millis > 10){
+    nh.spinOnce();
+    position_pub.publish( &position_value );
+    last_millis = millis();
+  }
 }
 
 void callback_pin2()
 {
   unsigned long diff = micros() - lastMicros_int;
-  //Serial.println(diff);
   if(diff > pulseTime_minTolered)
   {
     if(digitalRead(pin_hallSensorB) == LOW)
@@ -140,8 +161,7 @@ void callback_pin2()
     {
       position_count --;
     }
-    position_value.data = position_count;
-    //position_pub.publish( &position_value );
+  position_value.data = position_count;
   }  
   lastMicros_int = micros();
 }
