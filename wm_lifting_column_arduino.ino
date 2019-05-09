@@ -90,7 +90,7 @@ void setup()
   pinMode(pin_Btn_DN, INPUT_PULLUP);
   Serial.begin(57600);
   pwm_value.data = 0 ;
-  position_count = EEPROM.read(1);
+  position_count = EEPROM.read(ROM_adr);
   position_value.data = position_count;
   delay(10);
   attachInterrupt(digitalPinToInterrupt(pin_hallSensorA), callback_pin2, FALLING);
