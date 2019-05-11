@@ -23,6 +23,8 @@ const int max_value = 2387;
 
 
 volatile long position_count = 0;
+volatile long last_position_count = 0;
+long inactivity_counter = 0;
 
 unsigned long lastMicros_int   = 0;
 int last_millis = millis();
@@ -37,6 +39,7 @@ std_msgs::Int32 pwm_value; // 0 , 100 to 255 , -100 to -255
 
 ros::NodeHandle nh;
 std_msgs::Int32 position_value;
+
 
 ros::Publisher state_pub("column/state", &actuator_state);
 ros::Publisher position_pub("column/position", &position_value); // debugging purpose
@@ -107,40 +110,49 @@ void loop()
     actuator_state.data = topic_STOP; // override topic if btn is used
     digitalWrite(pin_DIR, UP);
     digitalWrite(pin_PWM, START);
-    flag_write_once = 1;
   }
   else if(digitalRead(pin_Btn_DN) == LOW)
   {
     actuator_state.data = topic_STOP; // override topic if btn is used
     digitalWrite(pin_DIR, DOWN);
     digitalWrite(pin_PWM, START);
-    flag_write_once = 1;
   }
   else if(actuator_state.data == topic_UP)
   {
     actuator_state.data = topic_UP; 
     digitalWrite(pin_DIR, UP);
     analogWrite(pin_PWM, pwm_value.data);
-    flag_write_once = 1;
   }
   else if(actuator_state.data == topic_DOWN)
   {
     actuator_state.data = topic_DOWN; 
     digitalWrite(pin_DIR, DOWN);
     analogWrite(pin_PWM, pwm_value.data);
-    flag_write_once = 1;
   }
   else
   {
     digitalWrite(pin_DIR, DOWN);
     digitalWrite(pin_PWM, STOP);
-    
-    if (flag_write_once){
-      EEPROM.write(ROM_adr,position_count);
-      flag_write_once = 0;
-    }
-    
   }
+
+
+  // Check if the collumn is moving and save the position in EEPROM once if not.
+  if (position_count == last_position_count){
+    inactivity_counter ++;
+    if (inactivity_counter > 20){  // Counter to add some tolerance.
+      if (flag_write_once){
+        EEPROM.write(ROM_adr,position_count);
+        flag_write_once = 0;
+      }
+    } else {
+      flag_write_once = 1;
+    }
+  } else {
+    inactivity_counter = 0;
+  }
+  last_position_count = position_count;
+
+
   if(millis() - last_millis > 10){
     nh.spinOnce();
     position_pub.publish( &position_value );
