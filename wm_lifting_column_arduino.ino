@@ -12,7 +12,7 @@
 #define START 1
 #define STOP 0
 
-const int ROM_adr = 0;
+const int ROM_adr = 500;
 const int pin_hallSensorA = 2;
 const int pin_hallSensorB = 3;
 const int pin_Btn_UP = 6;
@@ -21,13 +21,18 @@ const int pin_DIR = 4;
 const int pin_PWM = 5;
 const int max_value = 2387;
 
+union longtable {
+  long value;
+  byte table[4];
+};
 
-volatile long position_count = 0;
+volatile longtable position_count;
 volatile long last_position_count = 0;
+
 long inactivity_counter = 0;
 
 unsigned long lastMicros_int   = 0;
-int last_millis = millis();
+unsigned long last_millis = millis();
 const int pulseTime_minReal    = 12400;
 const int pulseTime_minTolered =  9500;
 
@@ -38,7 +43,7 @@ std_msgs::Int32 pwm_value; // 0 , 100 to 255 , -100 to -255
 
 
 ros::NodeHandle nh;
-std_msgs::Int32 position_value;
+volatile std_msgs::Int32 position_value;
 
 
 ros::Publisher state_pub("column/state", &actuator_state);
@@ -60,13 +65,13 @@ void set_state(const std_msgs::Int32& value)
 
 void set_zero()
 {
-  position_count = 0;
-  position_value.data = position_count;
+  position_count.value = 0;
+  position_value.data = position_count.value;
 }
 void set_max()
 {
-  position_count = max_value;
-  position_value.data = position_count;
+  position_count.value = max_value;
+  position_value.data = position_count.value;
 
 }
 
@@ -93,8 +98,12 @@ void setup()
   pinMode(pin_Btn_DN, INPUT_PULLUP);
   Serial.begin(57600);
   pwm_value.data = 0 ;
-  position_count = EEPROM.read(ROM_adr);
-  position_value.data = position_count;
+  position_count.table[0] = EEPROM.read(ROM_adr+0);
+  position_count.table[1] = EEPROM.read(ROM_adr+1);
+  position_count.table[2] = EEPROM.read(ROM_adr+2);
+  position_count.table[3] = EEPROM.read(ROM_adr+3);
+  last_position_count = position_count.value;
+  position_value.data = position_count.value;
   delay(10);
   attachInterrupt(digitalPinToInterrupt(pin_hallSensorA), callback_pin2, FALLING);
   
@@ -103,8 +112,7 @@ void setup()
 
 void loop() 
 {
-  delay(10);
-  
+
   if(digitalRead(pin_Btn_UP) == LOW)
   {
     actuator_state.data = topic_STOP; // override topic if btn is used
@@ -136,24 +144,29 @@ void loop()
   }
 
 
-  // Check if the collumn is moving and save the position in EEPROM once if not.
-  if (position_count == last_position_count){
-    inactivity_counter ++;
-    if (inactivity_counter > 20){  // Counter to add some tolerance.
-      if (flag_write_once){
-        EEPROM.write(ROM_adr,position_count);
-        flag_write_once = 0;
+  if(millis() - last_millis > 10){
+
+
+    // Check if the collumn is moving and save the position in EEPROM once if not.
+    if (position_count.value == last_position_count){
+      inactivity_counter ++;
+      if (inactivity_counter > 5){  // Counter to add some tolerance.
+        if (flag_write_once){
+          EEPROM.put(ROM_adr+0,position_count.table[0]);
+          EEPROM.put(ROM_adr+1,position_count.table[1]);
+          EEPROM.put(ROM_adr+2,position_count.table[2]);
+          EEPROM.put(ROM_adr+3,position_count.table[3]);
+          flag_write_once = 0;
+        }
+      } else {
+        flag_write_once = 1;
       }
     } else {
-      flag_write_once = 1;
+      inactivity_counter = 0;
     }
-  } else {
-    inactivity_counter = 0;
-  }
-  last_position_count = position_count;
+    last_position_count = position_count.value;
 
-
-  if(millis() - last_millis > 10){
+    
     nh.spinOnce();
     position_pub.publish( &position_value );
     last_millis = millis();
@@ -165,15 +178,15 @@ void callback_pin2()
   unsigned long diff = micros() - lastMicros_int;
   if(diff > pulseTime_minTolered)
   {
-    if(digitalRead(pin_hallSensorB) == LOW)
+    if(digitalRead(pin_hallSensorB) == HIGH)
     {
-      position_count ++;
+      position_count.value ++;
     }
     else
     {
-      position_count --;
+      position_count.value --;
     }
-  position_value.data = position_count;
+  position_value.data = position_count.value;
   }  
   lastMicros_int = micros();
 }
