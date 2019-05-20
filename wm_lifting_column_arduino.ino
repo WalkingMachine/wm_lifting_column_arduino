@@ -144,13 +144,13 @@ void loop()
   }
 
 
-  if(millis() - last_millis > 10){
+  if(millis() - last_millis > 50){
 
 
     // Check if the collumn is moving and save the position in EEPROM once if not.
     if (position_count.value == last_position_count){
       inactivity_counter ++;
-      if (inactivity_counter > 5){  // Counter to add some tolerance.
+      if (inactivity_counter > 2){  // Counter to add some tolerance.
         if (flag_write_once){
           EEPROM.put(ROM_adr+0,position_count.table[0]);
           EEPROM.put(ROM_adr+1,position_count.table[1]);
