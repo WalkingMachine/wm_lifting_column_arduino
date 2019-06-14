@@ -178,13 +178,13 @@ void callback_pin2()
   unsigned long diff = micros() - lastMicros_int;
   if(diff > pulseTime_minTolered)
   {
-    if(digitalRead(pin_hallSensorB) == HIGH)
+    if(actuator_state.data == topic_UP)
     {
-      position_count.value --;
+      position_count.value ++;
     }
     else
     {
-      position_count.value ++;
+      position_count.value --;
     }
   position_value.data = position_count.value;
   }  
