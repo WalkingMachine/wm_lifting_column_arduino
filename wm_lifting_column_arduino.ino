@@ -19,7 +19,7 @@ const int pin_Btn_UP = 6;
 const int pin_Btn_DN = 7;
 const int pin_DIR = 4;
 const int pin_PWM = 5;
-const int max_value = 2387;
+const int max_value = 2285;
 
 union longtable {
   long value;
@@ -180,11 +180,11 @@ void callback_pin2()
   {
     if(digitalRead(pin_hallSensorB) == HIGH)
     {
-      position_count.value ++;
+      position_count.value --;
     }
     else
     {
-      position_count.value --;
+      position_count.value ++;
     }
   position_value.data = position_count.value;
   }  
