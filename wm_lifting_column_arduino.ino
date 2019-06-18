@@ -4,8 +4,8 @@
 #include <std_msgs/Empty.h>
 #include <EEPROM.h>
 
-#define UP 1
-#define DOWN 0
+#define UP 0
+#define DOWN 1
 #define topic_DOWN -1
 #define topic_UP 1
 #define topic_STOP 0 
