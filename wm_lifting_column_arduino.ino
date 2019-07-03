@@ -164,6 +164,7 @@ void loop()
     } else {
       inactivity_counter = 0;
     }
+    
     last_position_count = position_count.value;
 
     
@@ -180,11 +181,25 @@ void callback_pin2()
   {
     if(actuator_state.data == topic_UP)
     {
-      position_count.value ++;
+      if(position_count.value > max_value)
+      {
+        position_count.value = max_value;
+      }
+      else
+      {
+        position_count.value++;
+      }
     }
     else
     {
-      position_count.value --;
+      if(position_count.value < 0)
+      {
+        position_count.value = 0;
+      }
+      else
+      {
+        position_count.value--;
+      }
     }
   position_value.data = position_count.value;
   }  
