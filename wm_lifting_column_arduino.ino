@@ -157,6 +157,14 @@ void loop()
           EEPROM.put(ROM_adr+2,position_count.table[2]);
           EEPROM.put(ROM_adr+3,position_count.table[3]);
           flag_write_once = 0;
+          if(actuator_state.data == topic_UP){
+              position_count.value = max_value;
+              position_value.data = position_count.value;
+          }
+          if(actuator_state.data == topic_DOWN){
+              position_count.value = 0;
+              position_value.data = position_count.value;
+          }
         }
       } else {
         flag_write_once = 1;
