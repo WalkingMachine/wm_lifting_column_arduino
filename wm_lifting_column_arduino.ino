@@ -19,7 +19,7 @@ const int pin_Btn_UP = 6;
 const int pin_Btn_DN = 7;
 const int pin_DIR = 4;
 const int pin_PWM = 5;
-const int max_value = 2285;
+const int max_value = 2230;
 
 union longtable {
   long value;
@@ -105,7 +105,7 @@ void setup()
   last_position_count = position_count.value;
   position_value.data = position_count.value;
   delay(10);
-  attachInterrupt(digitalPinToInterrupt(pin_hallSensorA), callback_pin2, FALLING);
+  attachInterrupt(digitalPinToInterrupt(pin_hallSensorB), callback_pin2, FALLING);
   
 }
 
@@ -150,7 +150,7 @@ void loop()
     // Check if the collumn is moving and save the position in EEPROM once if not.
     if (position_count.value == last_position_count){
       inactivity_counter ++;
-      if (inactivity_counter > 2){  // Counter to add some tolerance.
+      if (inactivity_counter > 20){  // Counter to add some tolerance.
         if (flag_write_once){
           EEPROM.put(ROM_adr+0,position_count.table[0]);
           EEPROM.put(ROM_adr+1,position_count.table[1]);
@@ -179,9 +179,11 @@ void callback_pin2()
   unsigned long diff = micros() - lastMicros_int;
   if(diff > pulseTime_minTolered)
   {
+
     if(actuator_state.data == topic_UP)
+    //if(digitalRead(pin_hallSensorB) == LOW)
     {
-      if(position_count.value > max_value)
+      if(position_count.value >= max_value)
       {
         position_count.value = max_value;
       }
@@ -190,9 +192,9 @@ void callback_pin2()
         position_count.value++;
       }
     }
-    else
+    else if (actuator_state.data == topic_DOWN)
     {
-      if(position_count.value < 0)
+      if(position_count.value <= 0)
       {
         position_count.value = 0;
       }
