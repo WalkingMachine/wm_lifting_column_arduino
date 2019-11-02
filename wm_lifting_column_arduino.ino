@@ -14,7 +14,6 @@ const int pin_Btn_UP = 6;
 const int pin_Btn_DN = 7;
 const int pin_DIR = 4;
 const int pin_PWM = 5;
-const int max_value = 2230;
 const int pin_hallSensorA = 2;
 const int pin_hallSensorB = 3;
 
