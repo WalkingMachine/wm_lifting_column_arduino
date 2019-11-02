@@ -91,8 +91,7 @@ void setup() {
   oldPosition.table[2] = EEPROM.read(ROMADDR+2);
   oldPosition.table[3] = EEPROM.read(ROMADDR+3);
 
-
-  oldPosition.value = -999;
+  myEnc.write(oldPosition.value);
 }
 
 
@@ -104,8 +103,6 @@ void loop() {
   if(currentMilis - lastMllis > 50){
   
     // Manage override buttons
-
-  
     if(digitalRead(pin_Btn_UP) == LOW) {
       oldButtonUPState = true;
       digitalWrite(pin_DIR, UP);
@@ -114,9 +111,7 @@ void loop() {
       oldButtonUPState = false;
       digitalWrite(pin_DIR, DOWN);
       digitalWrite(pin_PWM, STOP);
-    }
-
-    else if(digitalRead(pin_Btn_DN) == LOW) {
+    } else if(digitalRead(pin_Btn_DN) == LOW) {
       oldButtonDOWNState = true;
       digitalWrite(pin_DIR, DOWN);
       digitalWrite(pin_PWM, START);
