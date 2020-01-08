@@ -1,192 +1,146 @@
 #include <ros.h>
-#include <std_msgs/UInt32.h>
 #include <std_msgs/Int32.h>
-#include <std_msgs/Empty.h>
+#include <Encoder.h>
 #include <EEPROM.h>
 
-#define UP 0
-#define DOWN 1
-#define topic_DOWN -1
-#define topic_UP 1
-#define topic_STOP 0 
+#define UP 1
+#define DOWN 0
 #define START 1
 #define STOP 0
 
-const int ROM_adr = 500;
-const int pin_hallSensorA = 2;
-const int pin_hallSensorB = 3;
+/// Constantvalues
+const int ROMADDR = 500;
 const int pin_Btn_UP = 6;
 const int pin_Btn_DN = 7;
 const int pin_DIR = 4;
 const int pin_PWM = 5;
-const int max_value = 2285;
+const int pin_hallSensorA = 2;
+const int pin_hallSensorB = 3;
 
-union longtable {
+// Define the EEPROM storage type
+union EEPROMSpace {
   long value;
   byte table[4];
 };
 
-volatile longtable position_count;
-volatile long last_position_count = 0;
 
-long inactivity_counter = 0;
-
-unsigned long lastMicros_int   = 0;
-unsigned long last_millis = millis();
-const int pulseTime_minReal    = 12400;
-const int pulseTime_minTolered =  9500;
-
-bool flag_write_once = 0;
-
-std_msgs::Int32 actuator_state; // -1 down, 0 stop, 1 up
-std_msgs::Int32 pwm_value; // 0 , 100 to 255 , -100 to -255
+// Encoder creation
+//   Best Performance: both pins have interrupt capability
+//   Good Performance: only the first pin has interrupt capability
+//   Low Performance:  neither pin has interrupt capability
+Encoder myEnc(pin_hallSensorA, pin_hallSensorB);
+//   avoid using pins with LEDs attached
 
 
+// Position encoding variables
+EEPROMSpace oldPosition;
+long inactivityCounter = 0;
+long lastMllis = 0;
+
+// Buttons config
+bool oldButtonUPState = false;
+bool oldButtonDOWNState = false;
+
+// ROS callbacks
+void cmdCallback(const std_msgs::Int32& cmd) {
+  // Send commanded speed and direction to the drive
+  if(cmd.data  < 0){
+    digitalWrite(pin_DIR, DOWN);
+  } else if(cmd.data > 0){
+    digitalWrite(pin_DIR, UP);
+  }
+  analogWrite(pin_PWM, abs(cmd.data));
+}
+
+
+void setPosition(const std_msgs::Int32& pos) {
+  myEnc.write(pos.data);
+}
+
+
+// ROS objects
 ros::NodeHandle nh;
-volatile std_msgs::Int32 position_value;
+volatile std_msgs::Int32 positionMessage;
+ros::Publisher positionPub("column/position", &positionMessage);
+ros::Subscriber<std_msgs::Int32> subCmd("/column/cmd", cmdCallback );
+ros::Subscriber<std_msgs::Int32> subSetPosition("/column/set_position", setPosition );
 
 
-ros::Publisher state_pub("column/state", &actuator_state);
-ros::Publisher position_pub("column/position", &position_value); // debugging purpose
 
+// Start function
+void setup() {
 
-
-void set_state(const std_msgs::Int32& value)
-{
-  if(value.data  <= -1)
-    actuator_state.data = topic_DOWN;
-  else if(value.data == 0)
-    actuator_state.data = topic_STOP;
-  else if(value.data >= 1)
-    actuator_state.data = topic_UP;
-  pwm_value.data = abs(value.data);
-  state_pub.publish( &actuator_state );
-}
-
-void set_zero()
-{
-  position_count.value = 0;
-  position_value.data = position_count.value;
-}
-void set_max()
-{
-  position_count.value = max_value;
-  position_value.data = position_count.value;
-
-}
-
-ros::Subscriber<std_msgs::Int32> sub_cmd("/column/cmd", set_state );
-ros::Subscriber<std_msgs::Empty> sub_zero("/column/setZero", set_zero );
-ros::Subscriber<std_msgs::Empty> sub_max("/column/setMax", set_max );
-
-void setup() 
-{
+  Serial.begin(57600);
   nh.initNode();
-  nh.advertise(position_pub);
-  nh.advertise(state_pub);
-  nh.subscribe(sub_cmd);
-  nh.subscribe(sub_zero);
-  nh.subscribe(sub_max);
+  nh.advertise(positionPub);
+  nh.subscribe(subCmd);
+  nh.subscribe(subSetPosition);
 
+  // Configure pins
   pinMode(pin_PWM, OUTPUT);
   pinMode(pin_DIR, OUTPUT);
   digitalWrite(pin_PWM, STOP);
   digitalWrite(pin_DIR, UP);
-  pinMode(pin_hallSensorA, INPUT);
-  pinMode(pin_hallSensorB, INPUT);
   pinMode(pin_Btn_UP, INPUT_PULLUP);
   pinMode(pin_Btn_DN, INPUT_PULLUP);
-  Serial.begin(57600);
-  pwm_value.data = 0 ;
-  position_count.table[0] = EEPROM.read(ROM_adr+0);
-  position_count.table[1] = EEPROM.read(ROM_adr+1);
-  position_count.table[2] = EEPROM.read(ROM_adr+2);
-  position_count.table[3] = EEPROM.read(ROM_adr+3);
-  last_position_count = position_count.value;
-  position_value.data = position_count.value;
-  delay(10);
-  attachInterrupt(digitalPinToInterrupt(pin_hallSensorA), callback_pin2, FALLING);
-  
+
+  // Load previous position from EEPROM
+  oldPosition.table[0] = EEPROM.read(ROMADDR+0);
+  oldPosition.table[1] = EEPROM.read(ROMADDR+1);
+  oldPosition.table[2] = EEPROM.read(ROMADDR+2);
+  oldPosition.table[3] = EEPROM.read(ROMADDR+3);
+
+  myEnc.write(oldPosition.value);
 }
 
 
-void loop() 
-{
+// Loop function
+void loop() {
 
-  if(digitalRead(pin_Btn_UP) == LOW)
-  {
-    actuator_state.data = topic_STOP; // override topic if btn is used
-    digitalWrite(pin_DIR, UP);
-    digitalWrite(pin_PWM, START);
-  }
-  else if(digitalRead(pin_Btn_DN) == LOW)
-  {
-    actuator_state.data = topic_STOP; // override topic if btn is used
-    digitalWrite(pin_DIR, DOWN);
-    digitalWrite(pin_PWM, START);
-  }
-  else if(actuator_state.data == topic_UP)
-  {
-    actuator_state.data = topic_UP; 
-    digitalWrite(pin_DIR, UP);
-    analogWrite(pin_PWM, pwm_value.data);
-  }
-  else if(actuator_state.data == topic_DOWN)
-  {
-    actuator_state.data = topic_DOWN; 
-    digitalWrite(pin_DIR, DOWN);
-    analogWrite(pin_PWM, pwm_value.data);
-  }
-  else
-  {
-    digitalWrite(pin_DIR, DOWN);
-    digitalWrite(pin_PWM, STOP);
-  }
+  // Enforce rate
+  long currentMilis = millis();
+  if(currentMilis - lastMllis > 50){
+  
+    // Manage override buttons
+    if(digitalRead(pin_Btn_UP) == LOW) {
+      oldButtonUPState = true;
+      digitalWrite(pin_DIR, UP);
+      digitalWrite(pin_PWM, START);
+    } else if (oldButtonUPState) {
+      oldButtonUPState = false;
+      digitalWrite(pin_DIR, DOWN);
+      digitalWrite(pin_PWM, STOP);
+    } else if(digitalRead(pin_Btn_DN) == LOW) {
+      oldButtonDOWNState = true;
+      digitalWrite(pin_DIR, DOWN);
+      digitalWrite(pin_PWM, START);
+    } else if (oldButtonDOWNState) {
+      oldButtonDOWNState = false;
+      digitalWrite(pin_DIR, DOWN);
+      digitalWrite(pin_PWM, STOP);
+    }
 
 
-  if(millis() - last_millis > 50){
-
+    // Get the latest position
+    positionMessage.data = myEnc.read();
 
     // Check if the collumn is moving and save the position in EEPROM once if not.
-    if (position_count.value == last_position_count){
-      inactivity_counter ++;
-      if (inactivity_counter > 2){  // Counter to add some tolerance.
-        if (flag_write_once){
-          EEPROM.put(ROM_adr+0,position_count.table[0]);
-          EEPROM.put(ROM_adr+1,position_count.table[1]);
-          EEPROM.put(ROM_adr+2,position_count.table[2]);
-          EEPROM.put(ROM_adr+3,position_count.table[3]);
-          flag_write_once = 0;
-        }
-      } else {
-        flag_write_once = 1;
+    if (positionMessage.data == oldPosition.value){
+      inactivityCounter ++;
+      if (inactivityCounter == 20){  // Counter to add some tolerance.
+        EEPROM.put(ROMADDR+0,oldPosition.table[0]);
+        EEPROM.put(ROMADDR+1,oldPosition.table[1]);
+        EEPROM.put(ROMADDR+2,oldPosition.table[2]);
+        EEPROM.put(ROMADDR+3,oldPosition.table[3]);
       }
     } else {
-      inactivity_counter = 0;
+      inactivityCounter = 0;
     }
-    last_position_count = position_count.value;
-
     
+    // Update ROS
     nh.spinOnce();
-    position_pub.publish( &position_value );
-    last_millis = millis();
+    positionPub.publish( &positionMessage );
+    lastMllis = currentMilis;
+    oldPosition.value = positionMessage.data;
   }
-}
-
-void callback_pin2()
-{
-  unsigned long diff = micros() - lastMicros_int;
-  if(diff > pulseTime_minTolered)
-  {
-    if(digitalRead(pin_hallSensorB) == HIGH)
-    {
-      position_count.value --;
-    }
-    else
-    {
-      position_count.value ++;
-    }
-  position_value.data = position_count.value;
-  }  
-  lastMicros_int = micros();
 }
